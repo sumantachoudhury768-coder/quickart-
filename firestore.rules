@@ -1,0 +1,353 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'sumantachoudhury768@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin()
+        || (isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasUserRole(role) {
+      return isVerifiedUser()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function isVendor() {
+      return hasUserRole('vendor');
+    }
+
+    function isDeliveryPartner() {
+      return hasUserRole('delivery');
+    }
+
+    // Validation Blueprints (synchronized with firebase-blueprint.json)
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'phone', 'role', 'deliveryZone', 'defaultAddress', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 20))
+        && data.role in ['customer', 'vendor', 'delivery', 'admin']
+        && (!('deliveryZone' in data) || (data.deliveryZone is string && data.deliveryZone.size() <= 80))
+        && (!('defaultAddress' in data) || (data.defaultAddress is string && data.defaultAddress.size() <= 240))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'grantedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'grantedAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.grantedAt is timestamp;
+    }
+
+    function isValidStore(data) {
+      return data.keys().hasAll(['name', 'zone', 'address', 'ownerId', 'etaMinutes', 'rating', 'isActive', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['name', 'zone', 'address', 'ownerId', 'etaMinutes', 'rating', 'isActive', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.zone is string && data.zone.size() >= 2 && data.zone.size() <= 80
+        && data.address is string && data.address.size() >= 5 && data.address.size() <= 200
+        && isValidId(data.ownerId)
+        && data.etaMinutes is number && data.etaMinutes >= 5 && data.etaMinutes <= 180
+        && data.rating is number && data.rating >= 0 && data.rating <= 5
+        && data.isActive is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'brand', 'category', 'unit', 'price', 'mrp', 'stock', 'inStock', 'storeId', 'storeName', 'vendorId', 'imageUrl', 'description', 'featured', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['name', 'brand', 'category', 'unit', 'price', 'mrp', 'stock', 'inStock', 'storeId', 'storeName', 'vendorId', 'imageUrl', 'description', 'featured', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 120
+        && data.brand is string && data.brand.size() >= 1 && data.brand.size() <= 80
+        && data.category in ['Fresh Produce', 'Dairy & Bakery', 'Snacks & Instant', 'Beverages', 'Staples & Grains', 'Household & Care']
+        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 40
+        && data.price is number && data.price > 0 && data.price <= 50000
+        && data.mrp is number && data.mrp >= data.price && data.mrp <= 50000
+        && data.stock is number && data.stock >= 0 && data.stock <= 10000
+        && data.inStock is bool
+        && isValidId(data.storeId)
+        && data.storeName is string && data.storeName.size() >= 2 && data.storeName.size() <= 100
+        && isValidId(data.vendorId)
+        && data.imageUrl is string && data.imageUrl.size() <= 500
+        && data.description is string && data.description.size() <= 400
+        && data.featured is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['orderNumber', 'customerId', 'customerName', 'customerPhone', 'deliveryZone', 'deliveryAddress', 'storeId', 'storeName', 'vendorId', 'deliveryPartnerId', 'deliveryPartnerName', 'status', 'paymentMethod', 'paymentStatus', 'itemCount', 'items', 'subtotal', 'deliveryFee', 'total', 'deliveryOtp', 'notes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['orderNumber', 'customerId', 'customerName', 'customerPhone', 'deliveryZone', 'deliveryAddress', 'storeId', 'storeName', 'vendorId', 'deliveryPartnerId', 'deliveryPartnerName', 'status', 'paymentMethod', 'paymentStatus', 'itemCount', 'items', 'subtotal', 'deliveryFee', 'total', 'deliveryOtp', 'notes', 'createdAt', 'updatedAt'])
+        && data.orderNumber is string && data.orderNumber.size() >= 4 && data.orderNumber.size() <= 32 && data.orderNumber.matches('^QK-[0-9]{4,8}$')
+        && isValidId(data.customerId)
+        && data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 100
+        && data.customerPhone is string && data.customerPhone.size() >= 10 && data.customerPhone.size() <= 15
+        && data.deliveryZone is string && data.deliveryZone.size() >= 2 && data.deliveryZone.size() <= 80
+        && data.deliveryAddress is string && data.deliveryAddress.size() >= 5 && data.deliveryAddress.size() <= 240
+        && isValidId(data.storeId)
+        && data.storeName is string && data.storeName.size() >= 2 && data.storeName.size() <= 100
+        && isValidId(data.vendorId)
+        && data.deliveryPartnerId is string && data.deliveryPartnerId.size() <= 128
+        && data.deliveryPartnerName is string && data.deliveryPartnerName.size() <= 100
+        && data.status in ['placed', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled']
+        && data.paymentMethod in ['cod', 'upi']
+        && data.paymentStatus in ['pending', 'paid']
+        && data.itemCount is number && data.itemCount >= 1 && data.itemCount <= 100
+        && data.items is list && data.items.size() >= 1 && data.items.size() <= 30 && data.items[0] is map
+        && data.subtotal is number && data.subtotal > 0 && data.subtotal <= 100000
+        && data.deliveryFee is number && data.deliveryFee >= 0 && data.deliveryFee <= 500
+        && data.total is number && data.total == data.subtotal + data.deliveryFee
+        && data.deliveryOtp is string && data.deliveryOtp.size() >= 4 && data.deliveryOtp.size() <= 6 && data.deliveryOtp.matches('^[0-9]{4,6}$')
+        && data.notes is string && data.notes.size() <= 240
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll(['deliveryFee', 'freeDeliveryThreshold', 'minOrderAmount', 'serviceCity', 'supportPhone', 'updatedAt'])
+        && data.keys().hasOnly(['deliveryFee', 'freeDeliveryThreshold', 'minOrderAmount', 'serviceCity', 'supportPhone', 'updatedAt'])
+        && data.deliveryFee is number && data.deliveryFee >= 0 && data.deliveryFee <= 500
+        && data.freeDeliveryThreshold is number && data.freeDeliveryThreshold >= 0 && data.freeDeliveryThreshold <= 10000
+        && data.minOrderAmount is number && data.minOrderAmount >= 0 && data.minOrderAmount <= 5000
+        && data.serviceCity is string && data.serviceCity.size() >= 2 && data.serviceCity.size() <= 80
+        && data.supportPhone is string && data.supportPhone.size() >= 10 && data.supportPhone.size() <= 20
+        && data.updatedAt is timestamp;
+    }
+
+    // 1. Users collection (PII isolated strictly to owner or admin)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrappedAdmin();
+
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && ((isOwner(userId) && incoming().role == 'customer') || isAdmin());
+
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isOwner(userId)
+            && incoming().role == existing().role
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'deliveryZone', 'defaultAddress', 'updatedAt']))
+          || (isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'role', 'deliveryZone', 'defaultAddress', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 2. Admins registry
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrappedAdmin();
+
+      allow create: if isValidId(userId)
+        && isValidAdminRecord(incoming())
+        && incoming().uid == userId
+        && incoming().grantedAt == request.time
+        && isAdmin();
+
+      allow update: if false;
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 3. Partner Grocery Stores (Public non-PII catalog metadata)
+    match /stores/{storeId} {
+      allow get: if isValidId(storeId);
+      allow list: if true;
+
+      allow create: if isVerifiedUser()
+        && isValidId(storeId)
+        && isValidStore(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isAdmin() || (isVendor() && incoming().ownerId == request.auth.uid));
+
+      allow update: if isVerifiedUser()
+        && isValidId(storeId)
+        && isValidStore(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (existing().ownerId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'zone', 'address', 'etaMinutes', 'isActive', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(storeId) && isAdmin();
+    }
+
+    // 4. Products Catalogue (Publicly browsable, vendor/admin writable)
+    match /products/{productId} {
+      allow get: if isValidId(productId);
+      allow list: if true;
+
+      allow create: if isVerifiedUser()
+        && isValidId(productId)
+        && isValidProduct(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/stores/$(incoming().storeId))
+        && (isAdmin() || (isVendor() && incoming().vendorId == request.auth.uid));
+
+      allow update: if isVerifiedUser()
+        && isValidId(productId)
+        && isValidProduct(incoming())
+        && incoming().storeId == existing().storeId
+        && incoming().vendorId == existing().vendorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (existing().vendorId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'brand', 'category', 'unit', 'price', 'mrp', 'stock', 'inStock', 'imageUrl', 'description', 'featured', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(productId)
+        && isVerifiedUser()
+        && (isAdmin() || existing().vendorId == request.auth.uid);
+    }
+
+    // 5. Orders (PII protected, action-based state machine, terminal state locked)
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId)
+        && isSignedIn()
+        && (
+          existing().customerId == request.auth.uid
+          || existing().vendorId == request.auth.uid
+          || existing().deliveryPartnerId == request.auth.uid
+          || isAdmin()
+        );
+
+      allow list: if isSignedIn()
+        && (
+          existing().customerId == request.auth.uid
+          || existing().vendorId == request.auth.uid
+          || existing().deliveryPartnerId == request.auth.uid
+          || isBootstrappedAdmin()
+        );
+
+      allow create: if isVerifiedUser()
+        && isValidId(orderId)
+        && isValidOrder(incoming())
+        && incoming().customerId == request.auth.uid
+        && incoming().status == 'placed'
+        && incoming().deliveryPartnerId == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/stores/$(incoming().storeId));
+
+      allow update: if isVerifiedUser()
+        && isValidId(orderId)
+        && isValidOrder(incoming())
+        && incoming().orderNumber == existing().orderNumber
+        && incoming().customerId == existing().customerId
+        && incoming().storeId == existing().storeId
+        && incoming().vendorId == existing().vendorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            !(existing().status in ['delivered', 'cancelled'])
+            && (
+              // Action 1: Customer cancels while still placed
+              (existing().customerId == request.auth.uid
+                && existing().status == 'placed'
+                && incoming().status == 'cancelled'
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+              ||
+              // Action 2: Vendor confirms or packs order
+              (existing().vendorId == request.auth.uid
+                && ((existing().status == 'placed' && incoming().status == 'confirmed')
+                  || (existing().status == 'confirmed' && incoming().status == 'packed'))
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+              ||
+              // Action 3: Assigned delivery partner advances out_for_delivery -> delivered
+              (existing().deliveryPartnerId == request.auth.uid
+                && ((existing().status == 'packed' && incoming().status == 'out_for_delivery')
+                  || (existing().status == 'out_for_delivery' && incoming().status == 'delivered'))
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt']))
+              ||
+              // Action 4: Verified delivery partner claims a packed unassigned order
+              (isDeliveryPartner()
+                && existing().status == 'packed'
+                && existing().deliveryPartnerId == ''
+                && incoming().deliveryPartnerId == request.auth.uid
+                && incoming().status == 'out_for_delivery'
+                && incoming().diff(existing()).affectedKeys().hasOnly(['deliveryPartnerId', 'deliveryPartnerName', 'status', 'updatedAt']))
+            )
+          )
+        );
+
+      allow delete: if isValidId(orderId) && isAdmin();
+    }
+
+    // 6. Platform Settings (Publicly readable pricing rules, Admin writable)
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if false;
+
+      allow create: if isValidId(settingId)
+        && isValidPlatformSettings(incoming())
+        && incoming().updatedAt == request.time
+        && isAdmin();
+
+      allow update: if isValidId(settingId)
+        && isValidPlatformSettings(incoming())
+        && incoming().updatedAt == request.time
+        && isAdmin()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['deliveryFee', 'freeDeliveryThreshold', 'minOrderAmount', 'serviceCity', 'supportPhone', 'updatedAt']);
+
+      allow delete: if false;
+    }
+  }
+}

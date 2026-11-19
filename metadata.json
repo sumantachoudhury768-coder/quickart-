@@ -1,0 +1,8 @@
+{
+  "name": "QuickKart — Online Grocery Delivery",
+  "description": "Online grocery delivery platform for Dehradun students, hostels, and residential areas with real-time cart, checkout, order tracking, and Admin, Vendor, and Delivery Partner dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

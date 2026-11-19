@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile and delivery preferences for QuickKart customers, vendors, delivery partners, and admins.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "role": { "type": "string", "enum": ["customer", "vendor", "delivery", "admin"] },
+        "deliveryZone": { "type": "string", "maxLength": 80 },
+        "defaultAddress": { "type": "string", "maxLength": 240 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email", "role", "createdAt", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted registry of platform administrator UIDs.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "grantedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "grantedAt"]
+    },
+    "Store": {
+      "title": "Store",
+      "description": "Local partner grocery store in Dehradun.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "zone": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "address": { "type": "string", "minLength": 5, "maxLength": 200 },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "etaMinutes": { "type": "number" },
+        "rating": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "zone", "address", "ownerId", "etaMinutes", "rating", "isActive", "createdAt", "updatedAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Grocery item listed in the QuickKart catalogue.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "brand": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "category": { "type": "string", "enum": ["Fresh Produce", "Dairy & Bakery", "Snacks & Instant", "Beverages", "Staples & Grains", "Household & Care"] },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "price": { "type": "number" },
+        "mrp": { "type": "number" },
+        "stock": { "type": "number" },
+        "inStock": { "type": "boolean" },
+        "storeId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "storeName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "vendorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "description": { "type": "string", "maxLength": 400 },
+        "featured": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "brand", "category", "unit", "price", "mrp", "stock", "inStock", "storeId", "storeName", "vendorId", "imageUrl", "description", "featured", "createdAt", "updatedAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer grocery order with itemized list, pricing breakdown, delivery address, and lifecycle state.",
+      "type": "object",
+      "properties": {
+        "orderNumber": { "type": "string", "minLength": 4, "maxLength": 32, "pattern": "^QK-[0-9]{4,8}$" },
+        "customerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "customerPhone": { "type": "string", "minLength": 10, "maxLength": 15 },
+        "deliveryZone": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "deliveryAddress": { "type": "string", "minLength": 5, "maxLength": 240 },
+        "storeId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "storeName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "vendorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "deliveryPartnerId": { "type": "string", "maxLength": 128 },
+        "deliveryPartnerName": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["placed", "confirmed", "packed", "out_for_delivery", "delivered", "cancelled"] },
+        "paymentMethod": { "type": "string", "enum": ["cod", "upi"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid"] },
+        "itemCount": { "type": "number" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "total": { "type": "number" },
+        "deliveryOtp": { "type": "string", "minLength": 4, "maxLength": 6, "pattern": "^[0-9]{4,6}$" },
+        "notes": { "type": "string", "maxLength": 240 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderNumber", "customerId", "customerName", "customerPhone", "deliveryZone", "deliveryAddress", "storeId", "storeName", "vendorId", "deliveryPartnerId", "deliveryPartnerName", "status", "paymentMethod", "paymentStatus", "itemCount", "items", "subtotal", "deliveryFee", "total", "deliveryOtp", "notes", "createdAt", "updatedAt"]
+    },
+    "PlatformSettings": {
+      "title": "PlatformSettings",
+      "description": "Configurable QuickKart delivery fee, free delivery threshold, and city settings managed by Admin.",
+      "type": "object",
+      "properties": {
+        "deliveryFee": { "type": "number" },
+        "freeDeliveryThreshold": { "type": "number" },
+        "minOrderAmount": { "type": "number" },
+        "serviceCity": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "supportPhone": { "type": "string", "minLength": 10, "maxLength": 20 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["deliveryFee", "freeDeliveryThreshold", "minOrderAmount", "serviceCity", "supportPhone", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile documents isolated by userId (PII restricted to owner or admin)."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted administrator lookup documents."
+    },
+    "/stores/{storeId}": {
+      "schema": { "$ref": "#/entities/Store" },
+      "description": "Partner grocery stores in Dehradun."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Publicly browsable grocery product catalog managed by vendors and admins."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer orders containing delivery PII, strictly scoped to customer, vendor, assigned delivery partner, or admin."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/PlatformSettings" },
+      "description": "Platform-wide configurable delivery fee and business settings."
+    }
+  }
+}
